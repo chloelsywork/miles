@@ -170,36 +170,50 @@ function shortName(c) {
 
 function fmt(n) { return Number(n).toLocaleString(); }
 
-/* ── RENDER SPEND TABLE ── */
-function renderCatTable(assignments) {
-  document.getElementById('catBody').innerHTML = CATS.map(cat => {
+/* ── RENDER SPEND TABLE STRUCTURE (called once) ── */
+function renderCatTableStructure() {
+  document.getElementById('catBody').innerHTML = CATS.map(cat => `
+    <tr>
+      <td>${cat.label}</td>
+      <td><input class="cat-input" type="number" min="0" step="10" placeholder="0"
+        oninput="onSpendInput('${cat.id}',this.value)"></td>
+      <td id="card-${cat.id}" style="color:var(--text-3);font-size:11px">—</td>
+      <td id="rate-${cat.id}" style="text-align:center">—</td>
+      <td id="miles-${cat.id}" style="text-align:right" class="miles-val">—</td>
+    </tr>`).join('');
+}
+
+function onSpendInput(catId, val) {
+  spends[catId] = +val || 0;
+  calc();
+}
+
+/* ── UPDATE RESULT CELLS ONLY (preserves input focus) ── */
+function updateCatTable(assignments) {
+  CATS.forEach(cat => {
     const amt = spends[cat.id] || 0;
     const a = assignments[cat.id];
-    if (!amt || !a) return `<tr>
-      <td>${cat.label}</td>
-      <td><input class="cat-input" type="number" min="0" step="10" value="" placeholder="0"
-        oninput="spends['${cat.id}']=+this.value||0;calc()"></td>
-      <td style="color:var(--text-3)">—</td><td>—</td><td style="text-align:right">—</td>
-    </tr>`;
-
+    const cardEl  = document.getElementById('card-'  + cat.id);
+    const rateEl  = document.getElementById('rate-'  + cat.id);
+    const milesEl = document.getElementById('miles-' + cat.id);
+    if (!cardEl) return;
+    if (!amt || !a) {
+      cardEl.innerHTML  = '—';
+      rateEl.innerHTML  = '—';
+      milesEl.textContent = '—';
+      return;
+    }
     const segs = a.segments;
     const p = segs[0];
-    const cardLabel = shortName(p.card);
     const splitNote = segs.length > 1
       ? `<div class="split-note">Split: ${segs.map(sg =>
           `${shortName(sg.card)} S$${fmt(sg.amt)} @ ${sg.rate % 1 === 0 ? sg.rate : sg.rate.toFixed(1)} mpd`
         ).join(' → ')}</div>`
       : '';
-
-    return `<tr>
-      <td>${cat.label}</td>
-      <td><input class="cat-input" type="number" min="0" step="10" value="${amt}" placeholder="0"
-        oninput="spends['${cat.id}']=+this.value||0;calc()"></td>
-      <td style="color:var(--text-3);font-size:11px">${cardLabel}${splitNote}</td>
-      <td style="text-align:center">${rateBadge(p.rate, p.capped)}</td>
-      <td style="text-align:right" class="miles-val">${fmt(a.totalMiles)}</td>
-    </tr>`;
-  }).join('');
+    cardEl.innerHTML    = shortName(p.card) + splitNote;
+    rateEl.innerHTML    = rateBadge(p.rate, p.capped);
+    milesEl.textContent = fmt(a.totalMiles);
+  });
 }
 
 /* ── RENDER CAP BARS ── */
@@ -226,7 +240,7 @@ function renderCapBars(capUsed) {
 /* ── MAIN CALC ── */
 function calc() {
   const { assignments, capUsed } = computeAssignments();
-  renderCatTable(assignments);
+  updateCatTable(assignments);
   renderCapBars(capUsed);
 
   let ts = 0, tm = 0;
@@ -441,4 +455,5 @@ function setStatus(msg, type) {
 
 /* ── INIT ── */
 renderPicker();
+renderCatTableStructure();
 calc();
